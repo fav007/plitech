@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from millify import millify
 
-st.set_page_config(page_title="Plitech Service",page_icon= "✈"   ) 
+st.set_page_config(page_title="Plitech Service",page_icon= "✈") 
 hide_default_format = """
        <style>
        #MainMenu {visibility: hidden; }
@@ -61,8 +61,9 @@ def delete_row(num):
     conn.commit()
     st.warning(f"facture numéro {num} supprimée",icon="⚠️")
     time.sleep(0.5)
-    st.experimental_rerun()
     conn.close()
+    st.experimental_rerun()
+    
 
 def table_to_df(table):
     query = f"""select * from {table}"""
@@ -141,7 +142,7 @@ def plot_graph(df):
     # Set the labels and title
     ax.set_xlabel('Epaisseur')
     ax.set_ylabel('Quantité')
-    ax.set_title('Histogram of Epaisseur vs Quantity')
+    ax.set_title('Quantité par épaisseur')
 
     # Display the histogram in Streamlit
     st.pyplot(fig)
@@ -186,9 +187,17 @@ def generate_customers():
                                                     num_facture)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)""",x)
             conn.commit()
+            st.success(f"Facture numéro:{num_facture} au nom de {customers_name} a bien été ajoutée")
             st.session_state["items"].clear()
             st.success("ok")
             st.experimental_rerun()
+            
+def delete_all():
+    cursor.execute("delete from recap")
+    conn.commit()
+    st.success("Supprimé avec success")
+    conn.close()
+    st.experimental_rerun()
             
 
 
@@ -273,17 +282,28 @@ def main():
         with col[4]:
             st.metric("Total Tole pliés",f"{t_tole_plie}")
         
-            
+    with tabs[2]:
+        st.write('## Graphique')
+        plot_graph(df)     
         
-    conn.close()
+    
     
     with tabs[3]:
         st.title("Administration")
         
+        
+        st.write("## SUpprimé par facture")
         with st.form("administration"):
             num_facture = st.number_input("Numéro Facture",0,step=1)
             if st.form_submit_button("delete"):
                 delete_row(num_facture)
+                
+        st.write("## Tout supprimé")
+        if st.button(":red[Tout supprimé]"):
+            delete_all()
+                
+
+    conn.close()
                 
 if __name__ == '__main__':
     main()
