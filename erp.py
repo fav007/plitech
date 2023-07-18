@@ -29,20 +29,20 @@ aggregations = {
 # Establish a connection to the SQLite database
 conn = sqlite3.connect("plitech_database.db")
 cursor = conn.cursor()
-cursor.execute("""CREATE TABLE IF NOT EXISTS recap (
-	qty integer NOT NULL,
-   	is_plain TEXT NOT NULL,
-	longueur INTEGER ,
-    largeur INTEGER ,
-    type TEXT,
-    epaisseur TEXT,
-    nom_client TEXT,
-    date_arrivé TEXT,
-    heure_arrivé TEXT,
-    total_vente_tole INTEGER,
-    total_frais_pliage INTEGER,
-    total_remise INTEGER,
-    total_chute FLOAT ) ;""")
+# cursor.execute("""CREATE TABLE IF NOT EXISTS recap (
+# 	qty integer NOT NULL,
+#    	is_plain TEXT NOT NULL,
+# 	longueur INTEGER ,
+#     largeur INTEGER ,
+#     type TEXT,
+#     epaisseur TEXT,
+#     nom_client TEXT,
+#     date_arrivé TEXT,
+#     heure_arrivé TEXT,
+#     total_vente_tole INTEGER,
+#     total_frais_pliage INTEGER,
+#     total_remise INTEGER,
+#     total_chute FLOAT ) ;""")
 
 
 cond = [2000,1000]
@@ -219,7 +219,6 @@ def main():
 
     # Perform the aggregation
         result = df.groupby(['nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
-
         st.write(result)
         
     with tabs[1]:
