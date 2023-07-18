@@ -5,7 +5,7 @@ import datetime
 import time
 import matplotlib.pyplot as plt
 import numpy as np
-#from millify import millify
+from millify import millify
 
 st.set_page_config(page_title="Plitech Service",page_icon= "✈"   ) 
 hide_default_format = """
