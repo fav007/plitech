@@ -135,7 +135,7 @@ def generate_customers():
         customers_name = st.text_input("Nom client").upper()
         date_sheet_metal_entry = st.date_input("Date d'entrée")
         time_sheet_metal_entry = st.time_input("Time")
-        total_sales_sheet_metal = st.number_input('Total vente tôle en Ar',0,step=100)
+        total_sales_sheet_metal = st.number_input('Total vente tôle en Ar',0,step=100,format="%d")
         total_sales_service = st.number_input('Total frais de pliage en Ar',0,step=100)
         total_discount = st.number_input('Total remise en Ar',0,step=100)
         total_customers_fall_sheet_metal = st.number_input("Chute")
@@ -168,29 +168,40 @@ def generate_customers():
 def main():
     
     st.title("Logiciel de gestion d'entreprise")
-    df = table_to_df("recap")
-    ajout_tole()
-    generate_invoice()
-    generate_customers()
-    affiche_table(df)
-    plot_graph(df)
-    if st.button("supprimer donnée",disabled=True):
-        conn.execute("DELETE FROM recap;")
-        conn.commit()
-        st.experimental_rerun()
-    df.to_csv("a.csv")
-    aggregations = {
-    'total_vente_tole': 'mean',
-    'total_frais_pliage': 'mean',
-    'total_remise': 'mean',
-    'qty_tole': 'sum',
-    'total_chute':sum,
-}
+    tabs_title = ["💁 Input","Dashboard"]
+    tabs = st.tabs(tabs_title)
+    
+    with tabs[0]:
+        
+        df = table_to_df("recap")
+        ajout_tole()
+        generate_invoice()
+        generate_customers()
+        affiche_table(df)
+        plot_graph(df)
+        if st.button("supprimer donnée",disabled=True):
+            conn.execute("DELETE FROM recap;")
+            conn.commit()
+            st.experimental_rerun()
+        df.to_csv("a.csv")
+        aggregations = {
+        'total_vente_tole': 'mean',
+        'total_frais_pliage': 'mean',
+        'total_remise': 'mean',
+        'qty_tole': 'sum',
+        'total_chute':sum,
+        }
 
-# Perform the aggregation
-    result = df.groupby(['nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
+    # Perform the aggregation
+        result = df.groupby(['nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
+        ca = result[['total_vente_tole','total_frais_pliage']].sum()
 
-    st.write(result)
+        st.write(result)
+        
+    with tabs[1]:
+        st.title("Dashboard")
+        ca = 0
+        st.metric("Chiffre d'affaire",f"{ca} ar")
     conn.close()
 if __name__ == '__main__':
     main()
