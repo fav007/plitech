@@ -105,12 +105,13 @@ def ajout_tole():
         thickness_choice = ["7/10",'8/10','9/10','10/10','11/10','12/10','15/10','2mm','3mm','4mm']
         
     epaiseur = st.selectbox("Epaisseur",thickness_choice,1)
-    if st.button("Ajouter"):
-        st.session_state["items"].append((qty,is_plein,longueur,largeur,item_type, epaiseur))
-    if st.button("Effacer"):
-        st.session_state["items"].clear()
-    if st.button("finaliser"):
-        st.success("Toles ajoutés")  
+    col = st.columns(2)
+    with col[0]:
+        if st.button("Ajouter"):
+            st.session_state["items"].append((qty,is_plein,longueur,largeur,item_type, epaiseur))
+    with col[1]:
+        if st.button("Effacer"):
+            st.session_state["items"].clear()
 
 
 def affiche_table(df):
@@ -186,8 +187,9 @@ def generate_customers():
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)""",x)
             conn.commit()
             st.session_state["items"].clear()
-            st.experimental_rerun()
             st.success("ok")
+            st.experimental_rerun()
+            
 
 
     
@@ -222,7 +224,19 @@ def main():
         
     with tabs[1]:
         st.title("Dashboard")
-        st.metric("Chiffre d'affaire MGA",f"{millify(ca)}")
+        
+        
+        
+        st.write("## Cumul Général")
+        col = st.columns(4)
+        with col[0]:
+            st.metric("Chiffre d'affaire MGA",f"{millify(ca)}")
+        with col[1]:
+            st.metric("Total vente Tôles MGA",f"{millify(ca)}")
+        with col[2]:
+            st.metric("Total remise MGA",f"{millify(ca)}")
+        with col[3]:
+            st.metric("Total Tole pliés MGA",f"{millify(ca)}")
     conn.close()
     
     with tabs[3]:
