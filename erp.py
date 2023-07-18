@@ -199,9 +199,15 @@ def main():
     st.title("Logiciel de gestion d'entreprise")
     tabs_title = ["💁 Input","Dashboard","Graph","administration"]
     tabs = st.tabs(tabs_title)
+    
     df = table_to_df("recap")
     result = df.groupby(['nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
     ca = result['total_frais_pliage'].sum() + result['total_vente_tole'].sum()
+    t_vente_tole = result['total_vente_tole'].sum()
+    t_vente_pliage = result['total_frais_pliage'].sum()
+    t_remise = result['total_remise'].sum()
+    t_tole_plie = result['qty_tole'].sum()-result['total_chute'].sum()
+    
     with tabs[0]:
         
         
@@ -227,15 +233,48 @@ def main():
         
         
         st.write("## Cumul Général")
-        col = st.columns(4)
+        st.write("### Finances")
+        col = st.columns(5)
         with col[0]:
-            st.metric("Chiffre d'affaire MGA",f"{millify(ca)}")
+            st.metric("Chiffre d'affaire",f"{millify(ca)}")
         with col[1]:
-            st.metric("Total vente Tôles MGA",f"{millify(ca)}")
+            st.metric("Total vente Tôles",f"{millify(t_vente_tole)}")
         with col[2]:
-            st.metric("Total remise MGA",f"{millify(ca)}")
+            st.metric("Total service pliage",f"{millify(t_vente_pliage)}")
         with col[3]:
-            st.metric("Total Tole pliés MGA",f"{millify(ca)}")
+            st.metric("Total remise",f"{millify(t_remise)}")
+        with col[4]:
+            st.metric("Moyenne par tôles",f"{millify(t_vente_pliage/t_tole_plie)}")
+        
+        st.write("### Statistique Tôle")
+        
+        col = st.columns(5)
+        with col[0]:
+            st.metric("Total Tole pliés",f"{t_tole_plie}")
+        with col[1]:
+            st.metric("Mean Tole plié/jour",f"{millify(t_vente_tole)}")
+        with col[2]:
+            st.metric("Total service pliage",f"{millify(t_vente_pliage)}")
+        with col[3]:
+            st.metric("Total remise",f"{millify(t_remise)}")
+        with col[4]:
+            st.metric("Total Tole pliés",f"{t_tole_plie}")
+        
+        st.write("### Clients")
+        col = st.columns(5)
+        with col[0]:
+            st.metric("Total Tole pliés",f"{t_tole_plie}")
+        with col[1]:
+            st.metric("Mean Tole plié/jour",f"{millify(t_vente_tole)}")
+        with col[2]:
+            st.metric("Total service pliage",f"{millify(t_vente_pliage)}")
+        with col[3]:
+            st.metric("Total remise",f"{millify(t_remise)}")
+        with col[4]:
+            st.metric("Total Tole pliés",f"{t_tole_plie}")
+        
+            
+        
     conn.close()
     
     with tabs[3]:
