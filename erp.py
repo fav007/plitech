@@ -2,8 +2,10 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import datetime
+import time
 import matplotlib.pyplot as plt
 import numpy as np
+from millify import millify
 
 st.set_page_config(page_title="Plitech Service",page_icon= "✈"   ) 
 hide_default_format = """
@@ -13,6 +15,14 @@ hide_default_format = """
        </style>
        """
 st.markdown(hide_default_format, unsafe_allow_html=True)
+
+aggregations = {
+        'total_vente_tole': 'mean',
+        'total_frais_pliage': 'mean',
+        'total_remise': 'mean',
+        'qty_tole': 'sum',
+        'total_chute':'sum',
+        }
 
 
 
@@ -40,6 +50,19 @@ longueur,largeur = 2000 , 1000
 thickness_choice = ["25/100","30/100","35/100","40/100","45/100","50/100","55/100","60/100","65/100","7/10",'8/10','9/10','10/10','11/10','12/10','15/10','2mm','3mm','4mm']
     
 placeholder_entre_tole = st.empty()
+
+def delete_row(num):
+    conn = sqlite3.connect('plitech_database.db')
+    cursor = conn.cursor()
+
+    delete_query = "DELETE FROM recap WHERE num_facture = ?"
+    cursor.execute(delete_query, (f"{num}",))
+
+    conn.commit()
+    st.warning(f"facture numéro {num} supprimée",icon="⚠️")
+    time.sleep(0.5)
+    st.experimental_rerun()
+    conn.close()
 
 def table_to_df(table):
     query = f"""select * from {table}"""
@@ -135,13 +158,15 @@ def generate_customers():
         customers_name = st.text_input("Nom client").upper()
         date_sheet_metal_entry = st.date_input("Date d'entrée")
         time_sheet_metal_entry = st.time_input("Time")
+        num_facture = st.number_input('Numéro Facture',0,step=1)
         total_sales_sheet_metal = st.number_input('Total vente tôle en Ar',0,step=100,format="%d")
         total_sales_service = st.number_input('Total frais de pliage en Ar',0,step=100)
         total_discount = st.number_input('Total remise en Ar',0,step=100)
         total_customers_fall_sheet_metal = st.number_input("Chute")
         grand_total = total_sales_service + total_sales_sheet_metal
+        
         if st.form_submit_button():
-            u = [w + (customers_name,date_sheet_metal_entry.strftime("%Y-%m-%d"),time_sheet_metal_entry.strftime("%H:%M:%S"),total_sales_sheet_metal,total_sales_service,total_discount,total_customers_fall_sheet_metal) for w in st.session_state['items']]
+            u = [w + (customers_name,date_sheet_metal_entry.strftime("%Y-%m-%d"),time_sheet_metal_entry.strftime("%H:%M:%S"),total_sales_sheet_metal,total_sales_service,total_discount,total_customers_fall_sheet_metal,num_facture) for w in st.session_state['items']]
             st.write(f"Le Client {customers_name} plie {st.session_state['total_tole']} tôles pour un total de : {grand_total:,} Ar le {date_sheet_metal_entry} {time_sheet_metal_entry}")
             for x in u:
                 cursor.execute("""INSERT INTO recap(qty,
@@ -156,9 +181,11 @@ def generate_customers():
                                                     total_vente_tole,
                                                     total_frais_pliage,
                                                     total_remise,
-                                                    total_chute)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",x)
+                                                    total_chute,
+                                                    num_facture)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)""",x)
             conn.commit()
+            st.session_state["items"].clear()
             st.experimental_rerun()
             st.success("ok")
 
@@ -168,12 +195,14 @@ def generate_customers():
 def main():
     
     st.title("Logiciel de gestion d'entreprise")
-    tabs_title = ["💁 Input","Dashboard"]
+    tabs_title = ["💁 Input","Dashboard","Graph","administration"]
     tabs = st.tabs(tabs_title)
-    
+    df = table_to_df("recap")
+    result = df.groupby(['nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
+    ca = result['total_frais_pliage'].sum() + result['total_vente_tole'].sum()
     with tabs[0]:
         
-        df = table_to_df("recap")
+        
         ajout_tole()
         generate_invoice()
         generate_customers()
@@ -184,25 +213,26 @@ def main():
             conn.commit()
             st.experimental_rerun()
         df.to_csv("a.csv")
-        aggregations = {
-        'total_vente_tole': 'mean',
-        'total_frais_pliage': 'mean',
-        'total_remise': 'mean',
-        'qty_tole': 'sum',
-        'total_chute':sum,
-        }
+        
 
     # Perform the aggregation
         result = df.groupby(['nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
-        ca = result[['total_vente_tole','total_frais_pliage']].sum()
 
         st.write(result)
         
     with tabs[1]:
         st.title("Dashboard")
-        ca = 0
-        st.metric("Chiffre d'affaire",f"{ca} ar")
+        st.metric("Chiffre d'affaire MGA",f"{millify(ca)}")
     conn.close()
+    
+    with tabs[3]:
+        st.title("Administration")
+        
+        with st.form("administration"):
+            num_facture = st.number_input("Numéro Facture",0,step=1)
+            if st.form_submit_button("delete"):
+                delete_row(num_facture)
+                
 if __name__ == '__main__':
     main()
 
