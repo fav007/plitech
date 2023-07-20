@@ -16,6 +16,10 @@ hide_default_format = """
        """
 st.markdown(hide_default_format, unsafe_allow_html=True)
 
+
+conn = sqlite3.connect("plitech_database.db")
+cursor = conn.cursor()
+
 aggregations = {
         'total_vente_tole': 'mean',
         'total_frais_pliage': 'mean',
@@ -24,11 +28,12 @@ aggregations = {
         'total_chute':'sum',
         }
 
+if "items" not in st.session_state:
+    st.session_state.items = []
 
 
 # Establish a connection to the SQLite database
-conn = sqlite3.connect("plitech_database.db")
-cursor = conn.cursor()
+
 # cursor.execute("""CREATE TABLE IF NOT EXISTS recap (
 # 	qty integer NOT NULL,
 #    	is_plain TEXT NOT NULL,
@@ -142,18 +147,12 @@ def plot_graph(df):
     # Set the labels and title
     ax.set_xlabel('Epaisseur')
     ax.set_ylabel('Quantité')
-    ax.set_title('Quantité par épaisseur')
+    ax.set_title('Répartition en Tôle Plane')
 
     # Display the histogram in Streamlit
     st.pyplot(fig)
 
-  
 
-    
-
-if "items" not in st.session_state:
-    st.session_state.items = []
-    
 def generate_customers():
     with st.form('customers'):
         st.write("## Information client")
@@ -199,10 +198,46 @@ def delete_all():
     conn.close()
     st.experimental_rerun()
             
+def plot_client(result):
+    grouped_data = result.groupby('nom_client')
 
+    # Step 2: Calculate the sum of 'qty_tole' and 'total_frais_pliage' for each 'nom_client'
+    sum_qty_tole = grouped_data['qty_tole'].sum()
+    sum_total_frais_pliage = grouped_data['total_frais_pliage'].sum()
 
+    # Step 3: Combine the sums into a new DataFrame
+    sum_df = pd.DataFrame({
+        'sum_qty_tole': sum_qty_tole,
+        'sum_total_frais_pliage': sum_total_frais_pliage
+    })
+
+    # Step 4: Sort the data based on the calculated sums in descending order
+    sum_df = sum_df.sort_values(by=['sum_qty_tole', 'sum_total_frais_pliage'], ascending=False)
+
+    # Step 5: Extract the top 10 'nom_client' based on the sums
+    top_12_clients = sum_df.head(12)
+
+    # Step 6: Plot the results
+    fig = plt.figure(figsize=(12, 6))
+
+    plt.subplot(1, 2, 1)
+    plt.bar(top_12_clients.index, top_12_clients['sum_qty_tole'])
+    plt.xticks(rotation=45, ha='right')
+    plt.xlabel('Nom Client')
+    plt.ylabel('Sum of qty_tole')
+    plt.title('Top 12 Nom Clients by Sum of qty_tole')
+
+    plt.subplot(1, 2, 2)
+    plt.bar(top_12_clients.index, top_12_clients['sum_total_frais_pliage'])
+    plt.xticks(rotation=45, ha='right')
+    plt.xlabel('Nom Client')
+    plt.ylabel('Sum of total_frais_pliage')
+    plt.title('Top 12 Nom Clients by Sum of total_frais_pliage')
+
+    plt.tight_layout()
+    st.pyplot(fig)
     
-
+    
 def main():
     
     st.title("Logiciel de gestion d'entreprise")
@@ -215,10 +250,12 @@ def main():
     t_vente_tole = result['total_vente_tole'].sum()
     t_vente_pliage = result['total_frais_pliage'].sum()
     t_remise = result['total_remise'].sum()
+    t_tole_entree = result['qty_tole'].sum()
     t_tole_plie = result['qty_tole'].sum()-result['total_chute'].sum()
+    t_chute = result.total_chute.sum()
+    #c_top_tole = result.groupby('nom_client')["qty_tole"].sum().sort_values(ascending=False)[0]
     
     with tabs[0]:
-        
         
         ajout_tole()
         generate_invoice()
@@ -245,46 +282,46 @@ def main():
         st.write("### Finances")
         col = st.columns(5)
         with col[0]:
-            st.metric("Chiffre d'affaire",f"{millify(ca)}")
+            st.metric("Chiffre d'affaire",f"{millify(ca, precision=1)}")
         with col[1]:
-            st.metric("Total vente Tôles",f"{millify(t_vente_tole)}")
+            st.metric("Tot. recette tôles",f"{millify(t_vente_tole,precision=1)}")
         with col[2]:
-            st.metric("Total service pliage",f"{millify(t_vente_pliage)}")
+            st.metric("Tot. recette pliage",f"{millify(t_vente_pliage,precision=1)}")
         with col[3]:
-            st.metric("Total remise",f"{millify(t_remise)}")
-        with col[4]:
-            st.metric("Moyenne par tôles",f"{millify(t_vente_pliage/t_tole_plie)}")
+            st.metric("Tot. remise",f"{millify(t_remise)}")
         
-        st.write("### Statistique Tôle")
+        
+        st.write("### Statistique tôle")
         
         col = st.columns(5)
         with col[0]:
-            st.metric("Total Tole pliés",f"{t_tole_plie}")
+            st.metric("Tot. tôle entrée",f"{millify(t_tole_entree)}")
         with col[1]:
-            st.metric("Mean Tole plié/jour",f"{millify(t_vente_tole)}")
+            st.metric("Tot. tôle pliés",f"{millify(t_tole_plie)}")
         with col[2]:
-            st.metric("Total service pliage",f"{millify(t_vente_pliage)}")
+            st.metric("Tot. tôle vendus",f"{millify(1)}")
         with col[3]:
-            st.metric("Total remise",f"{millify(t_remise)}")
+            st.metric("Tot. chute tole",f"{millify(t_chute,1)}")
         with col[4]:
-            st.metric("Total Tole pliés",f"{t_tole_plie}")
+            st.metric("Tot. tole perdu",f"{0}")
         
         st.write("### Clients")
         col = st.columns(5)
         with col[0]:
-            st.metric("Total Tole pliés",f"{t_tole_plie}")
-        with col[1]:
-            st.metric("Mean Tole plié/jour",f"{millify(t_vente_tole)}")
-        with col[2]:
-            st.metric("Total service pliage",f"{millify(t_vente_pliage)}")
-        with col[3]:
-            st.metric("Total remise",f"{millify(t_remise)}")
-        with col[4]:
-            st.metric("Total Tole pliés",f"{t_tole_plie}")
+            st.metric("Tot. Clients",f"{df.nom_client.nunique()}")
+        # with col[1]:
+        #     st.metric("Top chiffre d'affaire",f"{millify(0)}")
+        # with col[2]:
+        #     st.metric("Top recette tole",f"{millify(0)}")
+        # with col[3]:
+        #     st.metric("Top nb. tôle",f"{0}")
+        # with col[4]:
+        #     st.metric("Top remise",f"{0}")
         
     with tabs[2]:
         st.write('## Graphique')
-        plot_graph(df)     
+        plot_graph(df)   
+        plot_client(result)  
         
     
     
