@@ -19,5 +19,12 @@ def delete_row(num):
     conn.commit()
     conn.close()
 
-delete_row(None)
+def update_row():
+    with sqlite3.connect('plitech_database.db') as conn:
+        cur = conn.cursor()
+        sql = "UPDATE recap SET nom_client = 'TINA' WHERE num_facture = 57"
+        cur.execute(sql)
+        conn.commit()
+
+update_row()
 

@@ -6,6 +6,8 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 from millify import millify
+import plotly.express as px
+from plotly_calplot import calplot
 
 st.set_page_config(page_title="Plitech Service",page_icon= "✈") 
 hide_default_format = """
@@ -80,7 +82,6 @@ def table_to_df(table):
 def generate_invoice():
     total_tole = 0
     st.write('## Entrée Tôle')
-    #st.write('Item\t\tPrice')
     st.write('-' * 30)
     for qty,is_plein,longueur,largeur,item_type, epaiseur in st.session_state["items"]:
         chute = {"Oui":'[chute]',"Non":''}
@@ -138,7 +139,7 @@ def plot_graph(df):
 
     # Create the histogram
     fig, ax = plt.subplots()
-    ax.hist(df['epaisseur_order'], weights=df['qty'], bins=np.arange(len(custom_order) + 1))
+    ax.hist(df['epaisseur_order'], weights=df['qty_tole'], bins=np.arange(len(custom_order) + 1))
 
     # Set the tick labels on the x-axis
     ax.set_xticks(np.arange(len(custom_order)))
@@ -151,6 +152,8 @@ def plot_graph(df):
 
     # Display the histogram in Streamlit
     st.pyplot(fig)
+    
+    
 
 
 def generate_customers():
@@ -158,7 +161,7 @@ def generate_customers():
         st.write("## Information client")
         customers_name = st.text_input("Nom client").upper()
         date_sheet_metal_entry = st.date_input("Date d'entrée")
-        time_sheet_metal_entry = st.time_input("Time")
+        time_sheet_metal_entry = st.time_input("Time",step=60)
         num_facture = st.number_input('Numéro Facture',0,step=1)
         total_sales_sheet_metal = st.number_input('Total vente tôle en Ar',0,step=100,format="%d")
         total_sales_service = st.number_input('Total frais de pliage en Ar',0,step=100)
@@ -186,9 +189,14 @@ def generate_customers():
                                                     num_facture)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)""",x)
             conn.commit()
-            st.success(f"Facture numéro:{num_facture} au nom de {customers_name} a bien été ajoutée")
+            st.toast(f"""
+                       Facture numéro:{num_facture} au nom de {customers_name} a bien été ajoutée \n
+                       Frais pliage : {total_sales_service} \n
+                       Vente tôle : {total_sales_sheet_metal} \n
+                       """)
             st.session_state["items"].clear()
             st.success("ok")
+            time.sleep(1)
             st.experimental_rerun()
             
 def delete_all():
@@ -234,8 +242,39 @@ def plot_client(result):
     plt.ylabel('Sum of total_frais_pliage')
     plt.title('Top 12 Nom Clients by Sum of total_frais_pliage')
 
-    plt.tight_layout()
     st.pyplot(fig)
+    
+def plot_by_month(result):
+    result.reset_index(inplace = True)
+    result['date_arrivé'] = pd.to_datetime(result['date_arrivé'])
+
+    # Step 2: Extract the month and year from 'date_arrivé'
+    result['month_year'] = result['date_arrivé'].dt.to_period('M')
+
+    # Step 3: Group the data by month and year, and calculate the sum of 'total_frais_pliage'
+    grouped_data = result.groupby('month_year')['total_frais_pliage'].sum()
+
+    # Create a Streamlit app
+    st.title('Total Frais Pliage by Month-Year')
+    st.write('This app displays the total frais pliage by month and year.')
+
+    # Show the data table (optional)
+
+    # Plot the data using matplotlib and display it in Streamlit
+    plt.figure(figsize=(10, 6))
+    plt.bar(grouped_data.index.astype(str), grouped_data.values)
+    plt.xlabel('Month-Year')
+    plt.ylabel('Total Frais Pliage')
+    plt.title('Total Frais Pliage by Month-Year')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+
+    # Show the plot using Streamlit
+    st.pyplot(plt)
+
+
+
+
     
     
 def main():
@@ -246,6 +285,7 @@ def main():
     
     df = table_to_df("recap")
     result = df.groupby(['nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
+    result["frais_par_tole"] = result['total_frais_pliage']/result['qty_tole']
     ca = result['total_frais_pliage'].sum() + result['total_vente_tole'].sum()
     t_vente_tole = result['total_vente_tole'].sum()
     t_vente_pliage = result['total_frais_pliage'].sum()
@@ -270,7 +310,6 @@ def main():
         
 
     # Perform the aggregation
-        result = df.groupby(['nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
         st.write(result)
         
     with tabs[1]:
@@ -318,10 +357,69 @@ def main():
         # with col[4]:
         #     st.metric("Top remise",f"{0}")
         
+        st.write("### Factures")
+        col = st.columns(5)
+        with col[0]:
+            st.metric("Tot. Factures",df.num_facture.nunique())
+            
+        st.write("## KPI Marketing")
+        col = st.columns(3)
+        with col[0]:
+            st.metric("Nombre clients",df.nom_client.nunique())
+        with col[1]:
+            st.metric("Freq. clients",millify(result.reset_index().nom_client.value_counts().mean(),precision=2))
+        with col[2]:
+            st.metric("Panier moyen",millify(result.reset_index().groupby("nom_client")["total_frais_pliage"].mean().mean(),precision=2))
+        
+        
     with tabs[2]:
         st.write('## Graphique')
         plot_graph(df)   
         plot_client(result)  
+        plot_by_month(result)
+        plt.figure()
+        result.nom_client.value_counts().head(12).plot(kind='bar')
+        plt.title('Fréquence client')
+        plt.xlabel("Clients")
+        plt.xticks(rotation=45, ha='right')
+        #plt.tight_layout()
+        st.pyplot(plt)
+        
+        plt.figure()
+        result.groupby('nom_client')['frais_par_tole'].mean().sort_values(ascending=False).head(12).plot(kind='bar')
+        plt.ylabel("Moyenne pliage pra tole par client")
+        plt.ylim(0,50000)
+        st.pyplot(plt)
+        
+        st.write("### Panier moyen frais pliage")
+        plt.figure()
+        result.groupby('nom_client')['total_frais_pliage'].mean().sort_values().plot(kind='bar')
+        st.pyplot(plt)
+        
+        st.write("### Panier moyen vente total")
+        plt.figure()
+        st.pyplot(plt)
+        
+        st.write("### Total frais pliage")
+        plt.figure()
+        result.groupby('nom_client')['total_frais_pliage'].sum().sort_values(ascending=False).head(12).plot(kind='bar')
+        st.pyplot(plt)
+        
+        st.bar_chart(df,x='epaisseur',y='qty_tole')
+        
+        fig = calplot(
+         result.groupby('date_arrivé')["qty_tole"].sum().reset_index(),
+         x="date_arrivé",
+         y="qty_tole")
+        st.plotly_chart(fig)
+        
+        fig = calplot(
+         result.groupby('date_arrivé')["total_frais_pliage"].sum().reset_index(),
+         x="date_arrivé",
+         y="total_frais_pliage",
+         colorscale='ylgn'
+         )
+        st.plotly_chart(fig)
         
     
     
@@ -329,12 +427,21 @@ def main():
         st.title("Administration")
         
         
-        st.write("## SUpprimé par facture")
+        st.write("## Supprimé par facture")
         with st.form("administration"):
             num_facture = st.number_input("Numéro Facture",0,step=1)
             if st.form_submit_button("delete"):
                 delete_row(num_facture)
                 
+        st.write("## Modifier données")
+        df_edited = st.data_editor(df)
+        if st.button("valider"):
+            df_edited.to_sql('recap', conn, if_exists='replace', index=False)
+            conn.close()
+            st.toast("validated")
+            st.success("validated")
+            time.sleep(1)
+            st.experimental_rerun()
         st.write("## Tout supprimé")
         if st.button(":red[Tout supprimé]"):
             delete_all()
