@@ -28,33 +28,19 @@ aggregations = {
         'total_remise': 'mean',
         'qty_tole': 'sum',
         'total_chute':'sum',
+        'num_facture':'mean'
         }
+
+cond = [2000,1000]
+longueur,largeur = 2000 , 1000
+thickness_choice = ["25/100","30/100","35/100","40/100","45/100","50/100","55/100","60/100","65/100","7/10",'8/10','9/10','10/10','11/10','12/10','15/10','2mm','3mm','4mm']
 
 if "items" not in st.session_state:
     st.session_state.items = []
 
 
-# Establish a connection to the SQLite database
-
-# cursor.execute("""CREATE TABLE IF NOT EXISTS recap (
-# 	qty integer NOT NULL,
-#    	is_plain TEXT NOT NULL,
-# 	longueur INTEGER ,
-#     largeur INTEGER ,
-#     type TEXT,
-#     epaisseur TEXT,
-#     nom_client TEXT,
-#     date_arrivé TEXT,
-#     heure_arrivé TEXT,
-#     total_vente_tole INTEGER,
-#     total_frais_pliage INTEGER,
-#     total_remise INTEGER,
-#     total_chute FLOAT ) ;""")
 
 
-cond = [2000,1000]
-longueur,largeur = 2000 , 1000
-thickness_choice = ["25/100","30/100","35/100","40/100","45/100","50/100","55/100","60/100","65/100","7/10",'8/10','9/10','10/10','11/10','12/10','15/10','2mm','3mm','4mm']
     
 placeholder_entre_tole = st.empty()
 
@@ -75,7 +61,7 @@ def delete_row(num):
 def table_to_df(table):
     query = f"""select * from {table}"""
     df = pd.read_sql_query(query, conn)
-    df['qty_tole'] = df["qty"]*df['longueur']*df['largeur']/2000000
+    df['qty_tole'] = df["qty"]*df['longueur']*df['largeur']/2_000_000
     
     return df
 
@@ -101,11 +87,16 @@ def ajout_tole():
     if is_plein == "Oui":
         longueur = st.number_input("Longueur",1,value=cond[0],step=1)
         largeur = st.number_input("Largeur",1,value=cond[1],step=1)
+        if largeur > longueur:
+            longueur,largeur = largeur,longueur
     else:
         longueur = 2000
         largeur = 1000
         
+    is_item_sold = st.radio("Vendu",["Non","Plitech","Tojo","Hanitra"])
+        
     item_type = st.selectbox("type",["TPN","TPG","TPI","TPP"])
+    
     if item_type == 'TPP':
         thickness_choice = ["25/100","30/100","35/100","40/100","45/100","50/100","55/100","60/100","65/100"]
     else :
@@ -115,7 +106,7 @@ def ajout_tole():
     col = st.columns(2)
     with col[0]:
         if st.button("Ajouter"):
-            st.session_state["items"].append((qty,is_plein,longueur,largeur,item_type, epaiseur))
+            st.session_state["items"].append((qty,is_plein,longueur,largeur,item_type, epaiseur,is_item_sold))
     with col[1]:
         if st.button("Effacer"):
             st.session_state["items"].clear()
@@ -126,7 +117,7 @@ def affiche_table(df):
     
 def plot_graph(df):
     
-    custom_order = ["7/10", "8/10", "9/10", "10/10", "11/10", "12/10", "15/10", "2mm", "3mm", "4mm"]
+    custom_order = ["30/100","40/100","60/100","7/10", "8/10", "9/10", "10/10", "11/10", "12/10", "15/10", "2mm", "3mm", "4mm"]
 
     # Create a mapping of the custom order to numerical values
     order_mapping = {value: i for i, value in enumerate(custom_order)}
@@ -280,7 +271,7 @@ def plot_by_month(result):
 def main():
     
     st.title("Logiciel de gestion d'entreprise")
-    tabs_title = ["💁 Input","Dashboard","Graph","administration"]
+    tabs_title = ["💁 Input","Dashboard","Graph","administration","Inventaire"]
     tabs = st.tabs(tabs_title)
     
     df = table_to_df("recap")
@@ -445,7 +436,24 @@ def main():
         st.write("## Tout supprimé")
         if st.button(":red[Tout supprimé]"):
             delete_all()
-                
+            
+    with tabs[4]:
+        
+        st.write("## Billetage")
+        
+        with st.form('billetage',clear_on_submit=True):
+            date_billetage = st.date_input("Date de billetage")
+            b20_000 = st.number_input("20 000",0,step=1)
+            b10_000 = st.number_input("10 000",0,step=1)
+            b5_000 = st.number_input("5 000",0,step=1)
+            b2_000 = st.number_input("2 000",0,step=1)
+            b1_000 = st.number_input("1 000",0,step=1)
+            b500 = st.number_input("500",0,step=1)
+            b200 = st.number_input("200",0,step=1)
+            b100 = st.number_input("100",0,step=1)
+            if st.form_submit_button():
+                total_tresorerie = 20_000*b20_000 + 10_000*b10_000 + 5_000 * b5_000 + 1_000 * b1_000 + 500*b500 + 200*b200 + 100 *b100
+                st.write(f'{date_billetage}: {total_tresorerie}ar')
 
     conn.close()
                 
