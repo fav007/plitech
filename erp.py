@@ -9,6 +9,11 @@ from millify import millify
 import plotly.express as px
 from plotly_calplot import calplot
 
+# total sales
+# total orders
+# average order value
+# returning customer rate
+
 st.set_page_config(page_title="Plitech Service",page_icon= "✈") 
 hide_default_format = """
        <style>
@@ -69,7 +74,7 @@ def generate_invoice():
     total_tole = 0
     st.write('## Entrée Tôle')
     st.write('-' * 30)
-    for qty,is_plein,longueur,largeur,item_type, epaiseur in st.session_state["items"]:
+    for qty,is_plein,longueur,largeur,item_type, epaiseur,is_item_sold in st.session_state["items"]:
         chute = {"Oui":'[chute]',"Non":''}
         st.write(f'{qty} \t {item_type} {epaiseur} \t\t {longueur} x {largeur} {chute[is_plein]}')
         #st.write(f'{qty*longueur*largeur/2_000_000}\t\t {item_type} {epaiseur}')
