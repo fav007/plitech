@@ -281,7 +281,7 @@ def plot_by_month(result):
 def main():
     st.image(im,width=150)
     st.title("Logiciel de gestion d'entreprise")
-    tabs_title = ["💁 Input","Dashboard","Graph","administration","Billetage"]
+    tabs_title = ["💁 Input","Dashboard","Graph","administration","Billetage","Tableau"]
     tabs = st.tabs(tabs_title)
     
     df = table_to_df("recap")
@@ -378,6 +378,9 @@ def main():
         
         
     with tabs[2]:
+        
+        #result.set_index(date)
+        
         st.write('## Graphique')
         plot_by_month(result)
         plot_graph(df)   
@@ -470,7 +473,7 @@ def main():
         
         with col1.form('billetage',clear_on_submit=True):
             date_billetage = st.date_input("Date de billetage")
-            b20_000 = st.number_input("20 000",0,step=1)
+            b20_000 = st.slider("20 000",0,step=1)
             b10_000 = st.number_input("10 000",0,step=1)
             b5_000 = st.number_input("5 000",0,step=1)
             b2_000 = st.number_input("2 000",0,step=1)
@@ -489,11 +492,14 @@ def main():
                 conn.commit()
                 a.info(f'**Référence:{cursor.lastrowid} du {date_billetage}: {total_tresorerie:,}ar**')
                 st.toast(f'Référence:{cursor.lastrowid} du {date_billetage}: {total_tresorerie}ar')
+                
         
         with col2:
             fig = px.line(df[["date",'total']].groupby('date').sum())
             st.plotly_chart(fig)
-                         
+    with tabs[5]:
+        st.dataframe(result.sort_values("num_facture"))
+        
 
     conn.close()
                 
