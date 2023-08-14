@@ -8,13 +8,17 @@ import numpy as np
 from millify import millify
 import plotly.express as px
 from plotly_calplot import calplot
+from PIL import Image
+import locale
+from helpers import table_to_df
+ma_locale = locale.setlocale(locale.LC_ALL, '')
 
 # total sales
 # total orders
 # average order value
 # returning customer rate
-
-st.set_page_config(page_title="Plitech Service",page_icon= "✈") 
+im = Image.open("bending.png")
+st.set_page_config(page_title="Plitech Service",page_icon= im) 
 hide_default_format = """
        <style>
        #MainMenu {visibility: hidden; }
@@ -23,6 +27,7 @@ hide_default_format = """
        """
 st.markdown(hide_default_format, unsafe_allow_html=True)
 
+#image_client = Image.open("C:\Users\USER\code\fav007\DGD\plitech\client.png")
 
 conn = sqlite3.connect("plitech_database.db")
 cursor = conn.cursor()
@@ -63,21 +68,20 @@ def delete_row(num):
     st.experimental_rerun()
     
 
-def table_to_df(table):
-    query = f"""select * from {table}"""
-    df = pd.read_sql_query(query, conn)
-    df['qty_tole'] = df["qty"]*df['longueur']*df['largeur']/2_000_000
-    
-    return df
+
 
 def generate_invoice():
+    
     total_tole = 0
     st.write('## Entrée Tôle')
     st.write('-' * 30)
     for qty,is_plein,longueur,largeur,item_type, epaiseur,is_item_sold in st.session_state["items"]:
+        owner = is_item_sold
         chute = {"Oui":'[chute]',"Non":''}
-        st.write(f'{qty} \t {item_type} {epaiseur} \t\t {longueur} x {largeur} {chute[is_plein]}')
-        #st.write(f'{qty*longueur*largeur/2_000_000}\t\t {item_type} {epaiseur}')
+        if is_item_sold == 'Non':
+            owner = 'Client'
+        
+        st.write(f'{qty} \t {item_type} {epaiseur} \t\t {longueur} x {largeur} {chute[is_plein]} [{owner}]')
         total_tole += qty*longueur*largeur/2_000_000
     st.write('-' * 30)
     st.write(f'Total Tôles :\t\t{total_tole:.2f}')
@@ -88,7 +92,7 @@ def ajout_tole():
     st.write("## Ajout de tôle")
     
     qty = st.number_input("Quantité",1,step=1)
-    is_plein = st.radio("Chute",("Non","Oui"))
+    is_plein = st.radio("Chute",("Non","Oui"),horizontal=True)
     if is_plein == "Oui":
         longueur = st.number_input("Longueur",1,value=cond[0],step=1)
         largeur = st.number_input("Largeur",1,value=cond[1],step=1)
@@ -98,7 +102,7 @@ def ajout_tole():
         longueur = 2000
         largeur = 1000
         
-    is_item_sold = st.radio("Vendu",["Non","Plitech","Tojo","Hanitra"])
+    is_item_sold = st.radio("Vendu",["Non","Plitech","Tojo","Hanitra"],horizontal=True)
         
     item_type = st.selectbox("type",["TPN","TPG","TPI","TPP"])
     
@@ -175,6 +179,7 @@ def generate_customers():
                                                     largeur,
                                                     type,
                                                     epaisseur,
+                                                    is_item_sold,
                                                     nom_client,
                                                     date_arrivé,
                                                     heure_arrivé,
@@ -183,7 +188,7 @@ def generate_customers():
                                                     total_remise,
                                                     total_chute,
                                                     num_facture)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)""",x)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?)""",x)
             conn.commit()
             st.toast(f"""
                        Facture numéro:{num_facture} au nom de {customers_name} a bien été ajoutée \n
@@ -274,9 +279,9 @@ def plot_by_month(result):
     
     
 def main():
-    
+    st.image(im,width=150)
     st.title("Logiciel de gestion d'entreprise")
-    tabs_title = ["💁 Input","Dashboard","Graph","administration","Inventaire"]
+    tabs_title = ["💁 Input","Dashboard","Graph","administration","Billetage"]
     tabs = st.tabs(tabs_title)
     
     df = table_to_df("recap")
@@ -356,7 +361,11 @@ def main():
         st.write("### Factures")
         col = st.columns(5)
         with col[0]:
-            st.metric("Tot. Factures",df.num_facture.nunique())
+            st.metric("Nbr. Factures",df.num_facture.nunique())
+        with col[1]:
+            st.metric("Dern. Factures",df.num_facture.max())
+        with col[2]:
+            st.metric("Fact. Non Enr.",2)
             
         st.write("## KPI Marketing")
         col = st.columns(3)
@@ -370,9 +379,10 @@ def main():
         
     with tabs[2]:
         st.write('## Graphique')
+        plot_by_month(result)
         plot_graph(df)   
         plot_client(result)  
-        plot_by_month(result)
+        
         plt.figure()
         result.nom_client.value_counts().head(12).plot(kind='bar')
         plt.title('Fréquence client')
@@ -383,7 +393,7 @@ def main():
         
         plt.figure()
         result.groupby('nom_client')['frais_par_tole'].mean().sort_values(ascending=False).head(12).plot(kind='bar')
-        plt.ylabel("Moyenne pliage pra tole par client")
+        plt.ylabel("Moyenne pliage par tole par client")
         plt.ylim(0,50000)
         st.pyplot(plt)
         
@@ -444,9 +454,21 @@ def main():
             
     with tabs[4]:
         
+        ## read data
+        
+        query = f"""select * from billetage"""
+        df = pd.read_sql_query(query, conn)
+        coef = [20_000,10_000,5_000,2_000,1_000,500,200,100]
+        df["total"] = (df.iloc[:,1:]*coef).sum(axis=1)
+        
+        
         st.write("## Billetage")
         
-        with st.form('billetage',clear_on_submit=True):
+        a = st.empty()
+        
+        col1,col2 = st.columns([0.3,0.7])
+        
+        with col1.form('billetage',clear_on_submit=True):
             date_billetage = st.date_input("Date de billetage")
             b20_000 = st.number_input("20 000",0,step=1)
             b10_000 = st.number_input("10 000",0,step=1)
@@ -457,8 +479,21 @@ def main():
             b200 = st.number_input("200",0,step=1)
             b100 = st.number_input("100",0,step=1)
             if st.form_submit_button():
-                total_tresorerie = 20_000*b20_000 + 10_000*b10_000 + 5_000 * b5_000 + 1_000 * b1_000 + 500*b500 + 200*b200 + 100 *b100
-                st.write(f'{date_billetage}: {total_tresorerie}ar')
+                total_tresorerie = 20_000*b20_000 + 10_000*b10_000 + 5_000 * b5_000 + 2_000*b2_000 + 1_000 * b1_000 + 500*b500 + 200*b200 + 100 *b100
+                sql = """
+                               insert into billetage (date,b20_000,b10_000,b5_000,b2_000,b1_000,b_500,b_200,b_100) 
+                               values(?,?,?,?,?,?,?,?,?)
+                               """
+                
+                cursor.execute(sql,(date_billetage,b20_000,b10_000,b5_000,b2_000,b1_000,b500,b200,b100))
+                conn.commit()
+                a.info(f'**Référence:{cursor.lastrowid} du {date_billetage}: {total_tresorerie:,}ar**')
+                st.toast(f'Référence:{cursor.lastrowid} du {date_billetage}: {total_tresorerie}ar')
+        
+        with col2:
+            fig = px.line(df[["date",'total']].groupby('date').sum())
+            st.plotly_chart(fig)
+                         
 
     conn.close()
                 
