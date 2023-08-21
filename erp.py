@@ -281,9 +281,10 @@ def plot_by_month(result):
 def main():
     st.image(im,width=150)
     st.title("Logiciel de gestion d'entreprise")
-    tabs_title = ["💁 Input","Dashboard","Graph","administration","Billetage","Tableau"]
+    tabs_title = ["💁 Input","Dashboard","Graph","administration","Billetage","Tableau","Dépense","Stocks"]
     tabs = st.tabs(tabs_title)
     
+    df_depense = pd.read_sql_query("select * from depense",conn)
     df = table_to_df("recap")
     result = df.groupby(['nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
     result["frais_par_tole"] = result['total_frais_pliage']/result['qty_tole']
@@ -293,7 +294,9 @@ def main():
     t_remise = result['total_remise'].sum()
     t_tole_entree = result['qty_tole'].sum()
     t_tole_plie = result['qty_tole'].sum()-result['total_chute'].sum()
+    t_tole_vendu = df.query("is_item_sold !='Non'")['qty_tole'].sum()
     t_chute = result.total_chute.sum()
+    t_depense = df_depense.montant.sum()
     #c_top_tole = result.groupby('nom_client')["qty_tole"].sum().sort_values(ascending=False)[0]
     
     with tabs[0]:
@@ -303,10 +306,6 @@ def main():
         generate_customers()
         affiche_table(df)
         plot_graph(df)
-        if st.button("supprimer donnée",disabled=True):
-            conn.execute("DELETE FROM recap;")
-            conn.commit()
-            st.experimental_rerun()
         df.to_csv("a.csv")
         
 
@@ -329,17 +328,19 @@ def main():
             st.metric("Tot. recette pliage",f"{millify(t_vente_pliage,precision=1)}")
         with col[3]:
             st.metric("Tot. remise",f"{millify(t_remise)}")
+        with col[4]:
+            st.metric("Tot. dépenses",f"{millify(t_depense)}")
         
         
         st.write("### Statistique tôle")
         
         col = st.columns(5)
         with col[0]:
-            st.metric("Tot. tôle entrée",f"{millify(t_tole_entree)}")
+            st.metric("Tot. tôle entrée",f"{millify(t_tole_entree,precision=1)}")
         with col[1]:
-            st.metric("Tot. tôle pliés",f"{millify(t_tole_plie)}")
+            st.metric("Tot. tôle pliés",f"{millify(t_tole_plie,precision=1)}")
         with col[2]:
-            st.metric("Tot. tôle vendus",f"{millify(1)}")
+            st.metric("Tot. tôle vendus",f"{millify(t_tole_vendu,precision=1)}")
         with col[3]:
             st.metric("Tot. chute tole",f"{millify(t_chute,1)}")
         with col[4]:
@@ -498,8 +499,44 @@ def main():
             fig = px.line(df[["date",'total']].groupby('date').sum())
             st.plotly_chart(fig)
     with tabs[5]:
-        st.dataframe(result.sort_values("num_facture"))
         
+        sql_read_depense = """select * from depense"""
+        
+        
+        st.write("## Recettes")
+        st.dataframe(result[["num_facture","date_arrivé","heure_arrivé","nom_client","qty_tole"]].sort_values("num_facture"))
+        st.write("## Dépenses")
+        st.dataframe(pd.read_sql_query(sql_read_depense,conn))
+    with tabs[6]:
+        
+        categorie_depense = [
+            "Achat Tôle","Frais accesoires d'achat","Achats de matériels,équipements et travaux","Achat d'études et de préstation de service",
+            "Achat non stockés de matières et fournitures","Rémunérations du personnel","Rémunération des dirigeants","Etudes et recherches","Locations","Déplacement, missions et réceptions",
+            "Frais postaux et de télécommunications","Cotisations et divers","Rémunérations d'intermédiaires et honoraires",
+            "Publicité, publication, relations publiques", "Services bancaires et assimilés", "Transport de biens et transport collectif du personnel"
+            "Achat de marchandises","RRR obtenus sur achats","Charges d'intérêts","Entretien, réparation et maintenance",
+            "Autres approvisionnements","Variation des stocks","impôts et taxes","Pertes sur créances irrécouvrables"
+        ]
+        
+        sql_insert = """ insert into depense(date,categorie,ref_piece,description,montant) values (?,?,?,?,?)"""
+        
+        
+        st.title('Dépenses')
+        
+        with st.form("depense",clear_on_submit=True):
+            date = st.date_input('Date')
+            cat = st.selectbox('Catégorie',categorie_depense)
+            ref_piece = st.text_input('Numéro pièce comptable')
+            description = st.text_area('Description')
+            montant = st.number_input('Montant totale (Ar)')
+            if st.form_submit_button():
+                data = (date,cat,ref_piece,description,montant)
+                conn.execute(sql_insert,data)
+                conn.commit()
+                st.success(f"**Date**:{date} \n **Catégorie**: {cat} \n **Montant**: {montant} ar \n Valider avec succès!")
+        
+    with tabs[7]:
+        st.title("Gestion de stocks")        
 
     conn.close()
                 
