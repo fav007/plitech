@@ -10,7 +10,7 @@ import plotly.express as px
 from plotly_calplot import calplot
 from PIL import Image
 import locale
-from helpers import table_to_df
+from helpers import table_to_df,data_preprocessing,plot_by_month
 ma_locale = locale.setlocale(locale.LC_ALL, '')
 
 # total sales
@@ -32,14 +32,6 @@ st.markdown(hide_default_format, unsafe_allow_html=True)
 conn = sqlite3.connect("plitech_database.db")
 cursor = conn.cursor()
 
-aggregations = {
-        'total_vente_tole': 'mean',
-        'total_frais_pliage': 'mean',
-        'total_remise': 'mean',
-        'qty_tole': 'sum',
-        'total_chute':'sum',
-        'num_facture':'mean'
-        }
 
 cond = [2000,1000]
 longueur,largeur = 2000 , 1000
@@ -245,33 +237,7 @@ def plot_client(result):
 
     st.pyplot(fig)
     
-def plot_by_month(result):
-    result.reset_index(inplace = True)
-    result['date_arrivé'] = pd.to_datetime(result['date_arrivé'])
 
-    # Step 2: Extract the month and year from 'date_arrivé'
-    result['month_year'] = result['date_arrivé'].dt.to_period('M')
-
-    # Step 3: Group the data by month and year, and calculate the sum of 'total_frais_pliage'
-    grouped_data = result.groupby('month_year')['total_frais_pliage'].sum()
-
-    # Create a Streamlit app
-    st.title('Total Frais Pliage by Month-Year')
-    st.write('This app displays the total frais pliage by month and year.')
-
-    # Show the data table (optional)
-
-    # Plot the data using matplotlib and display it in Streamlit
-    plt.figure(figsize=(10, 6))
-    plt.bar(grouped_data.index.astype(str), grouped_data.values)
-    plt.xlabel('Month-Year')
-    plt.ylabel('Total Frais Pliage')
-    plt.title('Total Frais Pliage by Month-Year')
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-
-    # Show the plot using Streamlit
-    st.pyplot(plt)
 
 
 
@@ -284,9 +250,19 @@ def main():
     tabs_title = ["💁 Input","Dashboard","Graph","administration","Billetage","Tableau","Dépense","Stocks"]
     tabs = st.tabs(tabs_title)
     
+    aggregations = {
+        'total_vente_tole': 'mean',
+        'total_frais_pliage': 'mean',
+        'total_remise': 'mean',
+        'qty_tole': 'sum',
+        'total_chute':'sum',
+        'ca':'mean'
+        }
+    
     df_depense = pd.read_sql_query("select * from depense",conn)
     df = table_to_df("recap")
-    result = df.groupby(['nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
+    df = data_preprocessing(df)
+    result = df.groupby(['num_facture','nom_client', 'date_arrivé', 'heure_arrivé']).agg(aggregations)
     result["frais_par_tole"] = result['total_frais_pliage']/result['qty_tole']
     ca = result['total_frais_pliage'].sum() + result['total_vente_tole'].sum()
     t_vente_tole = result['total_vente_tole'].sum()
@@ -366,7 +342,7 @@ def main():
         with col[1]:
             st.metric("Dern. Factures",df.num_facture.max())
         with col[2]:
-            st.metric("Fact. Non Enr.",2)
+            st.metric("Fact. Non Enr.",df.num_facture.max()-df.num_facture.nunique())
             
         st.write("## KPI Marketing")
         col = st.columns(3)
@@ -384,6 +360,7 @@ def main():
         
         st.write('## Graphique')
         plot_by_month(result)
+        plot_by_month(result,'ca')
         plot_graph(df)   
         plot_client(result)  
         
@@ -536,7 +513,25 @@ def main():
                 st.success(f"**Date**:{date} \n **Catégorie**: {cat} \n **Montant**: {montant} ar \n Valider avec succès!")
         
     with tabs[7]:
-        st.title("Gestion de stocks")        
+        
+        st.title("Gestion de stocks")
+        
+        
+        df = pd.read_sql_query("select * from stock",conn)
+          
+        with st.form('stock'):
+            date = st.date_input('Date')
+            montant = st.number_input('Montant[CUMP]',min_value=0)
+            if st.form_submit_button():
+                conn.execute("insert into stock (date,total_stock) values (?,?)",(date,montant))      
+                conn.commit()
+                st.success(f'Stock du {date} est {montant:,} Ar ajouté.')
+                time.sleep(0.7)
+                st.experimental_rerun()
+        
+        fig = px.line(df.sort_values('date'),'date','total_stock')
+        st.plotly_chart(fig)
+                
 
     conn.close()
                 
