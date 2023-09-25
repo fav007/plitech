@@ -473,8 +473,12 @@ def main():
                 
         
         with col2:
-            fig = px.line(df[["date",'total']].groupby('date').sum())
+            fig = px.line(df[["date",'total']].groupby('date').sum(),markers=True)
             st.plotly_chart(fig)
+            
+        st.divider()
+        
+        st.data_editor(df)
     with tabs[5]:
         
         sql_read_depense = """select * from depense"""
@@ -529,7 +533,7 @@ def main():
                 time.sleep(0.7)
                 st.experimental_rerun()
         
-        fig = px.line(df.sort_values('date'),'date','total_stock')
+        fig = px.line(df.sort_values('date'),'date','total_stock',markers=True)
         st.plotly_chart(fig)
                 
 

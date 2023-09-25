@@ -12,6 +12,7 @@ sql = """ select * from recap
 with sqlite3.Connection('plitech_database.db') as conn:
     cur = conn.cursor()
     df = pd.read_sql_query(sql,conn)
+    
 df['date_arrivé'] = pd.to_datetime(df.date_arrivé)    
 date_debut = df.date_arrivé.min()
 date_fin = df.date_arrivé.max()
