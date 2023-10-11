@@ -451,7 +451,7 @@ def main():
         
         with col1.form('billetage',clear_on_submit=True):
             date_billetage = st.date_input("Date de billetage")
-            b20_000 = st.slider("20 000",0,step=1)
+            b20_000 = st.number_input("20 000",0,step=1)
             b10_000 = st.number_input("10 000",0,step=1)
             b5_000 = st.number_input("5 000",0,step=1)
             b2_000 = st.number_input("2 000",0,step=1)
@@ -491,7 +491,7 @@ def main():
     with tabs[6]:
         
         categorie_depense = [
-            "Achat Tôle","Frais accesoires d'achat","Achats de matériels,équipements et travaux","Achat d'études et de préstation de service",
+            "Achat Tôle","Frais Roulage","Frais accesoires d'achat","Achats de matériels,équipements et travaux","Achat d'études et de préstation de service",
             "Achat non stockés de matières et fournitures","Rémunérations du personnel","Rémunération des dirigeants","Etudes et recherches","Locations","Déplacement, missions et réceptions",
             "Frais postaux et de télécommunications","Cotisations et divers","Rémunérations d'intermédiaires et honoraires",
             "Publicité, publication, relations publiques", "Services bancaires et assimilés", "Transport de biens et transport collectif du personnel"
